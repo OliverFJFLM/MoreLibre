@@ -5,5 +5,6 @@ library.db
 node_modules/
 .next/
 dist/
+.env*
 
 tsconfig.tsbuildinfo

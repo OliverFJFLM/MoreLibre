@@ -12,7 +12,7 @@ type Props = {
 
 const initialState = { email: "", password: "", fullName: "" };
 
-export function AuthCard({ onLogin, onRegister, busy }: Props) {
+function AuthCard({ onLogin, onRegister, busy }: Props) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [form, setForm] = useState(initialState);
   const [message, setMessage] = useState<string | null>(null);
@@ -120,3 +120,6 @@ export function AuthCard({ onLogin, onRegister, busy }: Props) {
     </section>
   );
 }
+
+export default AuthCard;
+export { AuthCard };

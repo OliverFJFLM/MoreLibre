@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import os
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -13,7 +14,7 @@ from . import models
 from .database import SessionLocal
 from .schemas import TokenData
 
-SECRET_KEY = "insecure-development-secret"
+SECRET_KEY = os.environ.get("SECRET_KEY", "insecure-development-secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
