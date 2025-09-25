@@ -42,11 +42,24 @@ class GoalCreate(GoalBase):
     pass
 
 
+class GoalBook(BaseModel):
+    id: int
+    shelf: str
+    recommendation_order: int
+    status: GoalStatus
+    completion_date: Optional[datetime] = None
+    reason: Optional[str] = None
+    book: Book
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class Goal(GoalBase):
     id: int
     archived: bool
     created_at: datetime
     updated_at: datetime
+    goal_books: List[GoalBook] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -58,8 +71,10 @@ class GoalBookStatusUpdate(BaseModel):
 
 class AvailabilitySnapshot(BaseModel):
     library_system: str
+    library_name: str
     status: AvailabilityStatus
     estimated_wait_days: Optional[int]
+    opac_url: Optional[str] = None
 
 
 class BookBase(BaseModel):
@@ -84,9 +99,11 @@ class Book(BookBase):
 
 class RecommendationItem(BaseModel):
     book: Book
+    goal_book_id: int
     shelf: str
     order: int
     reason: Optional[str]
+    status: GoalStatus
     availability: List[AvailabilitySnapshot]
 
 

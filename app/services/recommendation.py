@@ -34,6 +34,7 @@ class RecommendationEngine:
         self,
         db: Session,
         request: schemas.RecommendationRequest,
+        user: models.User | None = None,
     ) -> schemas.RecommendationResponse:
         # Basic heuristic: pick books matching simple keyword / ndc mapping
         candidate_books = self._select_books(db, request)
@@ -71,9 +72,10 @@ class RecommendationEngine:
             )
             assignments.append((book, rule.shelf, order_counter[rule.shelf], reason))
 
+        goal_owner = user or self._ensure_user(db)
         goal = crud.create_goal(
             db,
-            user=self._ensure_user(db),
+            user=goal_owner,
             goal_in=schemas.GoalCreate(title=request.goal_title, description=request.goal_description),
         )
         goal_books = crud.replace_goal_books(db, goal, assignments)
@@ -101,20 +103,37 @@ class RecommendationEngine:
             recommendation_items.append(
                 schemas.RecommendationItem(
                     book=schemas.Book.model_validate(gb.book),
+                    goal_book_id=gb.id,
                     shelf=gb.shelf,
                     order=gb.recommendation_order,
                     reason=gb.reason,
+                    status=gb.status,
                     availability=[
                         schemas.AvailabilitySnapshot(
                             library_system=snapshot.library_system.system_id,
+                            library_name=snapshot.library_system.name,
                             status=snapshot.status,
                             estimated_wait_days=snapshot.estimated_wait_days,
+                            opac_url=self._build_opac_url(
+                                snapshot.library_system.opac_base_url,
+                                snapshot.library_system.isbn_query_param,
+                                gb.book.isbn,
+                            ),
                         )
                         for snapshot in book_availability
+                        if snapshot.library_system is not None
                     ],
                 )
             )
         return schemas.RecommendationResponse.from_goal(goal_id=goal.id, recommendations=recommendation_items)
+
+    @staticmethod
+    def _build_opac_url(base_url: str, query_param: str | None, isbn: str) -> str | None:
+        if not base_url:
+            return None
+        param = query_param or "isbn"
+        separator = "&" if "?" in base_url else "?"
+        return f"{base_url}{separator}{param}={isbn}"
 
     def _select_books(self, db: Session, request: schemas.RecommendationRequest) -> List[models.Book]:
         books = db.query(models.Book).limit(request.limit).all()

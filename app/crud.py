@@ -94,6 +94,7 @@ def update_goal_book_status(
 ) -> models.GoalBook:
     goal_book.status = status.status
     goal_book.completion_date = status.completion_date
+    goal_book.goal.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(goal_book)
     return goal_book

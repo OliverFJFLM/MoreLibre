@@ -75,7 +75,7 @@ def read_goal(
     return schemas.Goal.model_validate(goal)
 
 
-@app.post("/goals/{goal_id}/books/{goal_book_id}/status", response_model=schemas.GoalBookStatusUpdate)
+@app.post("/goals/{goal_id}/books/{goal_book_id}/status", response_model=schemas.GoalBook)
 def update_goal_book_status(
     goal_id: int,
     goal_book_id: int,
@@ -89,16 +89,18 @@ def update_goal_book_status(
     goal_book = crud.get_goal_book(db, goal, goal_book_id)
     if not goal_book:
         raise HTTPException(status_code=404, detail="Goal book not found")
-    crud.update_goal_book_status(db, goal_book, payload)
-    return payload
+    updated = crud.update_goal_book_status(db, goal_book, payload)
+    return schemas.GoalBook.model_validate(updated)
 
 
 @app.post("/recommendations", response_model=schemas.RecommendationResponse)
 def generate_recommendations(
-    request: schemas.RecommendationRequest, db: Session = Depends(get_db)
+    request: schemas.RecommendationRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User | None = Depends(auth.get_optional_user),
 ):
     try:
-        response = recommendation_engine.recommend(db, request)
+        response = recommendation_engine.recommend(db, request, user=current_user)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return response
