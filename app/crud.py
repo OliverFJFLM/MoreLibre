@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable, List, Sequence
 
 from sqlalchemy.orm import Session
@@ -94,7 +94,7 @@ def update_goal_book_status(
 ) -> models.GoalBook:
     goal_book.status = status.status
     goal_book.completion_date = status.completion_date
-    goal_book.goal.updated_at = datetime.utcnow()
+    goal_book.goal.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(goal_book)
     return goal_book
@@ -156,7 +156,7 @@ def upsert_availability(
         else:
             snapshot.status = status
             snapshot.estimated_wait_days = wait_days
-            snapshot.fetched_at = datetime.utcnow()
+            snapshot.fetched_at = datetime.now(timezone.utc)
         snapshots.append(snapshot)
     db.commit()
     for snapshot in snapshots:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
@@ -17,6 +17,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
+
+
+def utcnow() -> datetime:
+    """Return a timezone-aware UTC datetime for model defaults."""
+    return datetime.now(timezone.utc)
 
 
 class GoalStatus(str, enum.Enum):
@@ -43,11 +48,11 @@ class Goal(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
-    deadline = Column(DateTime, nullable=True)
+    deadline = Column(DateTime(timezone=True), nullable=True)
     archived = Column(Boolean, default=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     user = relationship("User", back_populates="goals")
     goal_books = relationship(
@@ -86,7 +91,7 @@ class GoalBook(Base):
     shelf = Column(String, nullable=False)  # must_read / should_read / explore
     recommendation_order = Column(Integer, nullable=False)
     status = Column(Enum(GoalStatus), default=GoalStatus.unread, nullable=False)
-    completion_date = Column(DateTime, nullable=True)
+    completion_date = Column(DateTime(timezone=True), nullable=True)
     reason = Column(String, nullable=True)
 
     goal = relationship("Goal", back_populates="goal_books")
@@ -123,7 +128,7 @@ class AvailabilitySnapshot(Base):
     library_system_id = Column(Integer, ForeignKey("library_systems.id"), nullable=False)
     status = Column(Enum(AvailabilityStatus), default=AvailabilityStatus.unknown, nullable=False)
     estimated_wait_days = Column(Integer, nullable=True)
-    fetched_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fetched_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     book = relationship("Book", back_populates="availability_snapshots")
     library_system = relationship("LibrarySystem", back_populates="availability_snapshots")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -130,7 +130,7 @@ class RecommendationResponse(BaseModel):
         recommendations: List[RecommendationItem],
         ttl_minutes: int = 10,
     ) -> "RecommendationResponse":
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return cls(
             goal_id=goal_id,
             recommendations=recommendations,
