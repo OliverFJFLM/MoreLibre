@@ -45,6 +45,7 @@ export interface RecommendationItem {
   goal_book_id: number;
   shelf: string;
   order: number;
+  status: GoalStatus;
   reason?: string | null;
   availability: AvailabilitySnapshot[];
 }
