@@ -50,7 +50,11 @@ def test_user_registration_and_login():
     assert response.status_code == 201
     token_response = client.post(
         "/token",
-        data={"username": "test@example.com", "password": "StrongPass1!"},
+        data={
+            "grant_type": "password",
+            "username": "test@example.com",
+            "password": "StrongPass1!",
+        },
         headers={"content-type": "application/x-www-form-urlencoded"},
     )
     assert token_response.status_code == 200
@@ -66,7 +70,7 @@ def _register_and_login(email: str = "reader@example.com", password: str = "Stro
     assert response.status_code in (200, 201)
     token_response = client.post(
         "/token",
-        data={"username": email, "password": password},
+        data={"grant_type": "password", "username": email, "password": password},
         headers={"content-type": "application/x-www-form-urlencoded"},
     )
     assert token_response.status_code == 200

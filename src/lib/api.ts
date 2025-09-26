@@ -57,6 +57,7 @@ export async function login(payload: {
   password: string;
 }): Promise<string> {
   const body = new URLSearchParams();
+  body.append("grant_type", "password");
   body.append("username", payload.email);
   body.append("password", payload.password);
 
