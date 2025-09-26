@@ -47,8 +47,11 @@ function resolveBackendBase(request: NextRequest): string {
 }
 
 function buildTargetUrl(pathSegments: string[], request: NextRequest, base: string): URL {
+  const url = new URL(base);
   const targetPath = pathSegments.join("/");
-  const url = new URL(targetPath ? `/${targetPath}` : "", base);
+  const basePath = url.pathname.replace(/\/$/, "");
+  const combinedPath = [basePath, targetPath].filter((segment) => segment && segment !== "/").join("/");
+  url.pathname = combinedPath.length > 0 ? (combinedPath.startsWith("/") ? combinedPath : `/${combinedPath}`) : "/";
   url.search = request.nextUrl.search;
   return url;
 }
