@@ -1,6 +1,26 @@
 import type { Goal, GoalBook, GoalStatus, RecommendationResponse } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+function resolveApiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configured) {
+    if (configured.startsWith("http://") && typeof window !== "undefined" && window.location.protocol === "https:") {
+      return "/api/backend";
+    }
+    return configured.replace(/\/$/, "");
+  }
+  return "/api/backend";
+}
+
+function withBase(path: string): string {
+  const base = resolveApiBaseUrl();
+  if (base.endsWith("/") && path.startsWith("/")) {
+    return `${base}${path.slice(1)}`;
+  }
+  if (!base.endsWith("/") && !path.startsWith("/")) {
+    return `${base}/${path}`;
+  }
+  return `${base}${path}`;
+}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -22,7 +42,7 @@ export async function registerUser(payload: {
   password: string;
   full_name?: string;
 }): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/users`, {
+  const response = await fetch(withBase("/users"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -40,7 +60,7 @@ export async function login(payload: {
   body.append("username", payload.email);
   body.append("password", payload.password);
 
-  const response = await fetch(`${API_BASE_URL}/token`, {
+  const response = await fetch(withBase("/token"), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -50,7 +70,7 @@ export async function login(payload: {
 }
 
 export async function fetchGoals(token: string): Promise<Goal[]> {
-  const response = await fetch(`${API_BASE_URL}/goals`, {
+  const response = await fetch(withBase("/goals"), {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
@@ -61,7 +81,7 @@ export async function createGoal(
   token: string,
   payload: { title: string; description?: string }
 ): Promise<Goal> {
-  const response = await fetch(`${API_BASE_URL}/goals`, {
+  const response = await fetch(withBase("/goals"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -84,7 +104,7 @@ export async function requestRecommendations(
   },
   token?: string
 ): Promise<RecommendationResponse> {
-  const response = await fetch(`${API_BASE_URL}/recommendations`, {
+  const response = await fetch(withBase("/recommendations"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -102,7 +122,7 @@ export async function updateGoalBookStatus(
   status: GoalStatus
 ): Promise<GoalBook> {
   const response = await fetch(
-    `${API_BASE_URL}/goals/${goalId}/books/${goalBookId}/status`,
+    withBase(`/goals/${goalId}/books/${goalBookId}/status`),
     {
       method: "POST",
       headers: {
