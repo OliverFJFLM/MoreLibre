@@ -28,7 +28,7 @@ pip install -r requirements.txt
 export SECRET_KEY="change-me-in-production"
 export DATABASE_URL="sqlite:///./library.db"
 
-uvicorn app.main:app --reload
+uvicorn backend.main:app --reload
 ```
 
 起動後は `http://127.0.0.1:8000/docs` からインタラクティブに API を試せます。
@@ -97,7 +97,7 @@ npm run build
 
 ## ディレクトリ構成
 
-- `app/`: FastAPI ベースのバックエンド実装
+- `backend/`: FastAPI ベースのバックエンド実装
 - `src/`: Next.js (App Router) フロントエンド。ログイン／目的登録／推薦表示 UI を提供
 - `docs/`: 要件定義ドキュメントなど
 - `tests/`: Pytest による API テスト

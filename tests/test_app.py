@@ -10,9 +10,9 @@ from sqlalchemy.pool import StaticPool
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app import models
-from app.auth import get_db
-from app.main import app
+from backend import models
+from backend.auth import get_db
+from backend.main import app
 
 SQLALCHEMY_DATABASE_URL = "sqlite://"
 engine = create_engine(
