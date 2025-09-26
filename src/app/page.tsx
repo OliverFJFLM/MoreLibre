@@ -1,17 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import AuthCard from "@/components/AuthCard";
-import { GoalProgressList } from "@/components/GoalProgressList";
-import { RecommendationList } from "@/components/RecommendationList";
+import AuthCard from "../components/AuthCard";
+import { GoalProgressList } from "../components/GoalProgressList";
+import { RecommendationList } from "../components/RecommendationList";
 import {
   fetchGoals,
   login,
   registerUser,
   requestRecommendations,
   updateGoalBookStatus,
-} from "@/lib/api";
-import type { Goal, GoalStatus, RecommendationItem, RecommendationResponse } from "@/lib/types";
+} from "../lib/api";
+import type { Goal, GoalStatus, RecommendationItem, RecommendationResponse } from "../lib/types";
 
 const STORAGE_KEY = "morelibre.auth_token";
 

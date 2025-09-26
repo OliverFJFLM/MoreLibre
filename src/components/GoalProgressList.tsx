@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Goal, GoalBook, GoalStatus } from "@/lib/types";
+import type { Goal, GoalBook, GoalStatus } from "../lib/types";
 
 type Props = {
   goals: Goal[];
