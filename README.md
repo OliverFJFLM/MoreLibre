@@ -68,7 +68,7 @@ npm run build
 | --- | --- | --- | --- |
 | `SECRET_KEY` | バックエンド | `insecure-development-secret` | JWT 署名に使用。必ず本番では十分に長いランダム値を設定してください。 |
 | `DATABASE_URL` | バックエンド | `sqlite:///./library.db` | SQLAlchemy の接続先。PostgreSQL 等に差し替える場合はこちらを変更します。 |
-| `BACKEND_BASE_URL` | フロントエンド (サーバー) | `http://localhost:8000` | Next.js の API プロキシが転送する先の FastAPI URL。HTTP のみでも動作します。 |
+| `BACKEND_BASE_URL` | フロントエンド (サーバー) | `http://localhost:8000` | Next.js の API プロキシが転送する先の FastAPI URL。Vercel では未設定でも `/api/python` に配置した FastAPI が自動検出されます。 |
 | `NEXT_PUBLIC_API_BASE_URL` | フロントエンド | `http://localhost:8000` | ブラウザから呼び出す API のベース URL。HTTPS で公開されていない場合は未設定でも可。 |
 | `NEXT_PUBLIC_SITE_URL` | フロントエンド | なし | サイトマップ・robots.txt の生成に利用する公開 URL。 |
 
@@ -80,7 +80,7 @@ Next.js 側の `/api/backend/*` ルートは `BACKEND_BASE_URL` で指定した 
 
 1. GitHub リポジトリを Vercel プロジェクトに接続します。
 2. Project Settings → Environment Variables に以下を追加します。
-   - `BACKEND_BASE_URL`: FastAPI のエンドポイント URL（HTTP/HTTPS どちらでも可）
+   - `BACKEND_BASE_URL`: FastAPI のエンドポイント URL（HTTP/HTTPS どちらでも可）。FastAPI を同じ Vercel プロジェクトの `/api/python` でホストする場合は未設定でも自動で解決されます。
    - `NEXT_PUBLIC_API_BASE_URL`: 公開したい FastAPI の HTTPS URL（任意。未設定の場合は Next.js のプロキシ `/api/backend/*` を経由）
    - `NEXT_PUBLIC_SITE_URL`: `https://{your-project}.vercel.app`
 3. バックエンドを Vercel Serverless Functions で動かす場合は `SECRET_KEY` と `DATABASE_URL` を同じく環境変数として登録します（外部 DB を推奨）。

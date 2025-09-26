@@ -2,7 +2,19 @@ import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const rawBase = (process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(/\/$/, "");
+function resolveBackendBase(): string {
+  const explicit = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (explicit && explicit.trim().length > 0) {
+    return explicit.trim().replace(/\/$/, "");
+  }
+
+  const vercelUrl = process.env.VERCEL_URL;
+  if (vercelUrl && vercelUrl.trim().length > 0) {
+    return `https://${vercelUrl.replace(/\/$/, "")}/api/python`;
+  }
+
+  return "http://localhost:8000";
+}
 
 function buildTargetUrl(pathSegments: string[], request: NextRequest, base: string): URL {
   const targetPath = pathSegments.join("/");
@@ -43,7 +55,8 @@ function copyResponseHeaders(response: Response): Headers {
 
 async function proxy(request: NextRequest, context: { params: { path?: string[] } }) {
   const pathSegments = context.params.path ?? [];
-  const targetUrl = buildTargetUrl(pathSegments, request, rawBase);
+  const base = resolveBackendBase();
+  const targetUrl = buildTargetUrl(pathSegments, request, base);
 
   const init: RequestInit = {
     method: request.method,
@@ -62,7 +75,7 @@ async function proxy(request: NextRequest, context: { params: { path?: string[] 
   try {
     upstreamResponse = await fetch(targetUrl, init);
   } catch (error) {
-    const alternativeBase = httpsFallback(rawBase);
+    const alternativeBase = httpsFallback(base);
     if (alternativeBase) {
       const httpsUrl = buildTargetUrl(pathSegments, request, alternativeBase);
       try {
