@@ -149,21 +149,45 @@ export default function HomePage() {
     async (payload: { email: string; password: string }) => {
       setAuthBusy(true);
       setErrorMessage(null);
+      setStatusMessage(null);
       try {
         const accessToken = await login(payload);
         setToken(accessToken);
         if (typeof window !== "undefined") {
           window.localStorage.setItem(STORAGE_KEY, accessToken);
         }
+
+        const fetchedGoals = await fetchGoals(accessToken);
+        setGoals(fetchedGoals);
+
+        if (fetchedGoals.length > 0) {
+          const primaryGoal = fetchedGoals[0];
+          setSelectedGoalId(primaryGoal.id);
+          setRecommendationItems(mapGoalBooks(primaryGoal));
+          setRecommendationMeta({
+            goal_id: primaryGoal.id,
+            generated_at: primaryGoal.updated_at,
+            expires_at: primaryGoal.updated_at,
+          });
+        } else {
+          setSelectedGoalId(null);
+          setRecommendationItems([]);
+          setRecommendationMeta(null);
+        }
+
+        setStatusMessage("ログインしました。");
       } catch (error) {
         const message = formatErrorMessage(error);
         setErrorMessage(message);
+        if (message.includes("401")) {
+          signOut();
+        }
         throw error;
       } finally {
         setAuthBusy(false);
       }
     },
-    []
+    [signOut]
   );
 
   const handleRegister = useCallback(

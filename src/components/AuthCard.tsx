@@ -31,6 +31,7 @@ function AuthCard({ onLogin, onRegister, busy }: Props) {
         setMessage("登録が完了しました。続けてログインしてください。");
       } else {
         await onLogin({ email: form.email, password: form.password });
+        setForm(initialState);
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "エラーが発生しました");
