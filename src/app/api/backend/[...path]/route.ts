@@ -21,6 +21,51 @@ function firstHeaderValue(value: string | null): string | null {
   return match ?? null;
 }
 
+function localBackendFallback(): string | null {
+  if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
+    return null;
+  }
+
+  const candidates = [
+    process.env.LOCAL_BACKEND_BASE_URL,
+    process.env.DEV_BACKEND_BASE_URL,
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+  ];
+
+  for (const value of candidates) {
+    if (value && value.trim().length > 0) {
+      return stripTrailingSlash(value.trim());
+    }
+  }
+
+  return null;
+}
+
+function parseHostname(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  try {
+    const { hostname } = new URL(value);
+    return hostname;
+  } catch (error) {
+    return null;
+  }
+}
+
+function isLocalHostname(hostname: string | null): boolean {
+  if (!hostname) {
+    return false;
+  }
+  return /^(localhost|127(?:\.\d{1,3}){3})$/i.test(hostname);
+}
+
+function buildPythonApiBase(origin: string): string {
+  const sanitizedOrigin = stripTrailingSlash(origin);
+  return `${sanitizedOrigin}/api/python`;
+}
+
 function resolveBackendBase(request: NextRequest): string {
   const explicit = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
   if (explicit && explicit.trim().length > 0) {
@@ -32,7 +77,7 @@ function resolveBackendBase(request: NextRequest): string {
     const vercelOrigin = stripTrailingSlash(ensureHttpsOrigin(vercelUrl.trim()))
       .split(",")[0]
       .trim();
-    return `${vercelOrigin}/api/python`;
+    return buildPythonApiBase(vercelOrigin);
   }
 
   let requestOrigin: string | null = null;
@@ -44,30 +89,47 @@ function resolveBackendBase(request: NextRequest): string {
   } catch (error) {
     requestOrigin = null;
   }
-  if (requestOrigin) {
-    return `${requestOrigin}/api/python`;
-  }
 
   const host =
     firstHeaderValue(request.headers.get("x-forwarded-host")) ??
     firstHeaderValue(request.headers.get("host"));
-  if (host) {
-    const protocol =
-      firstHeaderValue(request.headers.get("x-forwarded-proto")) ??
-      firstHeaderValue(request.headers.get("x-forwarded-protocol")) ??
-      (() => {
-        try {
-          const proto = request.nextUrl.protocol.replace(/:$/, "");
-          if (proto) {
-            return proto;
-          }
-        } catch (error) {
-          return undefined;
+  const protocol =
+    firstHeaderValue(request.headers.get("x-forwarded-proto")) ??
+    firstHeaderValue(request.headers.get("x-forwarded-protocol")) ??
+    (() => {
+      try {
+        const proto = request.nextUrl.protocol.replace(/:$/, "");
+        if (proto) {
+          return proto;
         }
+      } catch (error) {
         return undefined;
-      })() ??
-      (host.includes("localhost") ? "http" : "https");
-    return `${stripTrailingSlash(`${protocol}://${host}`)}/api/python`;
+      }
+      return undefined;
+    })() ??
+    (host && host.includes("localhost") ? "http" : "https");
+
+  const headerOrigin = host ? stripTrailingSlash(`${protocol}://${host}`) : null;
+  const candidateOrigin = requestOrigin ?? headerOrigin;
+  const candidateHostname = parseHostname(candidateOrigin);
+
+  if (candidateOrigin) {
+    if (isLocalHostname(candidateHostname)) {
+      const localFallback = localBackendFallback();
+      if (localFallback) {
+        return localFallback;
+      }
+    }
+    return buildPythonApiBase(candidateOrigin);
+  }
+
+  if (host) {
+    return buildPythonApiBase(`${protocol}://${host}`);
+  }
+
+  const localFallback = localBackendFallback();
+  if (localFallback) {
+    return localFallback;
   }
 
   throw new Error("Unable to resolve backend origin from request");
