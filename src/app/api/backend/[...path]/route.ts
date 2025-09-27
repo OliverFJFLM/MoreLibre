@@ -1,6 +1,9 @@
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+type RouteContext = { params: { path?: string[] } };
 
 let productionHttpWarningEmitted = false;
 
@@ -202,7 +205,7 @@ function copyResponseHeaders(response: Response): Headers {
   return headers;
 }
 
-async function proxy(request: NextRequest, context: { params: { path?: string[] } }) {
+async function proxy(request: NextRequest, context: RouteContext) {
   const pathSegments = context.params.path ?? [];
   const base = resolveBackendBase(request);
   const targetUrl = buildTargetUrl(pathSegments, request, base);
@@ -269,30 +272,12 @@ async function proxy(request: NextRequest, context: { params: { path?: string[] 
   });
 }
 
-export async function GET(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
-}
+const handler = (request: NextRequest, context: RouteContext) => proxy(request, context);
 
-export async function HEAD(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
-}
-
-export async function POST(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
-}
-
-export async function PUT(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
-}
-
-export async function PATCH(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
-}
-
-export async function DELETE(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
-}
-
-export async function OPTIONS(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
-}
+export { handler as GET };
+export { handler as HEAD };
+export { handler as POST };
+export { handler as PUT };
+export { handler as PATCH };
+export { handler as DELETE };
+export { handler as OPTIONS };
