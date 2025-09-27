@@ -7,7 +7,7 @@ from typing import List, Sequence
 from sqlalchemy.orm import Session
 
 from .. import crud, models, schemas
-from ..integrations.carl_api import CarilClient, DEFAULT_AVAILABILITY_MAP
+from ..integrations.carl_api import CarilClient
 
 
 @dataclass
@@ -27,7 +27,7 @@ class RecommendationEngine:
     """Generates deterministic recommendations for demonstration purposes."""
 
     def __init__(self, client: CarilClient | None = None, rules: Sequence[RecommendationRule] | None = None):
-        self.client = client or CarilClient(DEFAULT_AVAILABILITY_MAP)
+        self.client = client or CarilClient()
         self.rules = list(rules or DEFAULT_RULES)
 
     def recommend(
