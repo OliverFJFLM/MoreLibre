@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+let productionHttpWarningEmitted = false;
+
 function stripTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
@@ -66,10 +68,32 @@ function buildPythonApiBase(origin: string): string {
   return `${sanitizedOrigin}/api/python`;
 }
 
+function assertProductionSafeBase(base: string): void {
+  const isProd = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+  if (!isProd) {
+    return;
+  }
+
+  if (/^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3})(?::\d+)?(?:\/.*)?$/i.test(base)) {
+    throw new Error(
+      "BACKEND_BASE_URL/NEXT_PUBLIC_API_BASE_URL points to localhost in production. Configure a publicly reachable FastAPI endpoint or remove the variables to use the /api/python proxy."
+    );
+  }
+
+  if (base.startsWith("http://") && !productionHttpWarningEmitted) {
+    productionHttpWarningEmitted = true;
+    console.warn(
+      "BACKEND_BASE_URL/NEXT_PUBLIC_API_BASE_URL is using http:// in production. Ensure the backend supports HTTPS or rely on the built-in /api/backend proxy to avoid mixed content issues."
+    );
+  }
+}
+
 function resolveBackendBase(request: NextRequest): string {
   const explicit = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
   if (explicit && explicit.trim().length > 0) {
-    return stripTrailingSlash(explicit.trim());
+    const sanitized = stripTrailingSlash(explicit.trim());
+    assertProductionSafeBase(sanitized);
+    return sanitized;
   }
 
   const vercelUrl = process.env.VERCEL_URL;

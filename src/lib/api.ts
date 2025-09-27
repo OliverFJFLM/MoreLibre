@@ -1,9 +1,29 @@
 import type { Goal, GoalBook, GoalStatus, RecommendationResponse } from "./types";
 
+let warnedMixedContent = false;
+let warnedLocalhostInProduction = false;
+
 function resolveApiBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (configured) {
+    if (
+      process.env.NODE_ENV === "production" &&
+      /https?:\/\/(?:localhost|127(?:\.\d{1,3}){3})(?::\d+)?(?:\/.*)?$/i.test(configured) &&
+      !warnedLocalhostInProduction
+    ) {
+      warnedLocalhostInProduction = true;
+      console.warn(
+        "NEXT_PUBLIC_API_BASE_URL points to localhost in production. Remove the variable to use the built-in proxy or update it to the deployed FastAPI endpoint."
+      );
+    }
+
     if (configured.startsWith("http://") && typeof window !== "undefined" && window.location.protocol === "https:") {
+      if (!warnedMixedContent) {
+        warnedMixedContent = true;
+        console.warn(
+          "NEXT_PUBLIC_API_BASE_URL uses http:// while the site runs over HTTPS. Falling back to /api/backend to avoid mixed content."
+        );
+      }
       return "/api/backend";
     }
     return configured.replace(/\/$/, "");

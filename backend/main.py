@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from typing import List
 
@@ -15,10 +16,43 @@ from .services.recommendation import RecommendationEngine
 
 models.Base.metadata.create_all(bind=engine)
 
+
+def build_cors_origins() -> List[str]:
+    raw = os.getenv("CORS_ALLOW_ORIGINS")
+    if not raw:
+        return ["*"]
+
+    origins: List[str] = []
+    seen: set[str] = set()
+
+    for part in raw.split(","):
+        value = part.strip()
+        if not value:
+            continue
+
+        if value.startswith("http://") or value.startswith("https://"):
+            candidate = value.rstrip("/")
+        else:
+            http_candidate = f"http://{value}".rstrip("/")
+            https_candidate = f"https://{value}".rstrip("/")
+            for candidate in (http_candidate, https_candidate):
+                if candidate not in seen:
+                    seen.add(candidate)
+                    origins.append(candidate)
+            continue
+
+        if candidate not in seen:
+            seen.add(candidate)
+            origins.append(candidate)
+
+    return origins or ["*"]
+
+
 app = FastAPI(title="MoreLibre", description="City library recommendation MVP")
+cors_allow_origins = build_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

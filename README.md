@@ -39,8 +39,8 @@ uvicorn backend.main:app --reload
 npm install
 
 # .env.local を作成して API エンドポイントを指定
-echo "BACKEND_BASE_URL=http://localhost:8000" >> .env.local
-echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8000" >> .env.local
+echo "BACKEND_BASE_URL=http://127.0.0.1:8000" >> .env.local
+echo "NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000" >> .env.local
 echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" >> .env.local
 
 npm run dev
@@ -68,9 +68,10 @@ npm run build
 | --- | --- | --- | --- |
 | `SECRET_KEY` | バックエンド | `insecure-development-secret` | JWT 署名に使用。必ず本番では十分に長いランダム値を設定してください。 |
 | `DATABASE_URL` | バックエンド | `sqlite:///./library.db` | SQLAlchemy の接続先。PostgreSQL 等に差し替える場合はこちらを変更します。 |
-| `BACKEND_BASE_URL` | フロントエンド (サーバー) | `http://localhost:8000` | Next.js の API プロキシが転送する先の FastAPI URL。Vercel では未設定でも `/api/python` に配置した FastAPI が自動検出されます。 |
-| `NEXT_PUBLIC_API_BASE_URL` | フロントエンド | `http://localhost:8000` | ブラウザから呼び出す API のベース URL。HTTPS で公開されていない場合は未設定でも可。 |
+| `BACKEND_BASE_URL` | フロントエンド (サーバー) | `http://127.0.0.1:8000` | Next.js の API プロキシが転送する先の FastAPI URL。Vercel では未設定でも `/api/python` に配置した FastAPI が自動検出されます。 |
+| `NEXT_PUBLIC_API_BASE_URL` | フロントエンド | `http://127.0.0.1:8000` | ブラウザから呼び出す API のベース URL。HTTPS で公開されていない場合は未設定でも可。 |
 | `NEXT_PUBLIC_SITE_URL` | フロントエンド | なし | サイトマップ・robots.txt の生成に利用する公開 URL。 |
+| `CORS_ALLOW_ORIGINS` | バックエンド | なし | カンマ区切りで指定したオリジンのみ許可します。スキームを省略すると `http://` と `https://` が両方登録されます。 |
 | `CALIL_APP_KEY` | バックエンド | なし | カーリルのアプリキー。設定すると実際の在架照会 API を使用し、未設定時はスタブデータが返ります。 |
 | `CALIL_API_BASE_URL` | バックエンド | `https://api.calil.jp` | （任意）プロキシやサンドボックス経由で利用する際の API ベース URL。 |
 
@@ -85,9 +86,37 @@ Next.js 側の `/api/backend/*` ルートは `BACKEND_BASE_URL` で指定した 
    - `BACKEND_BASE_URL`: FastAPI のエンドポイント URL（HTTP/HTTPS どちらでも可）。FastAPI を同じ Vercel プロジェクトの `/api/python` でホストする場合は未設定でも自動で解決されます。
    - `NEXT_PUBLIC_API_BASE_URL`: 公開したい FastAPI の HTTPS URL（任意。未設定の場合は Next.js のプロキシ `/api/backend/*` を経由）
    - `NEXT_PUBLIC_SITE_URL`: `https://{your-project}.vercel.app`
+   - `CORS_ALLOW_ORIGINS`: `your-domain.com` のようにカンマ区切りで指定。プレビュー用サブドメインも忘れずに含めてください。
 3. バックエンドを Vercel Serverless Functions で動かす場合は `SECRET_KEY` と `DATABASE_URL` を同じく環境変数として登録します（外部 DB を推奨）。
 4. Deploy Hook を利用して main ブランチへ push するたびに自動デプロイが走るよう設定します。
 5. デプロイ後に `https://{your-project}.vercel.app/` へアクセスし、ログイン→目的登録→推薦リスト表示まで確認してください。
+
+## 本番デプロイ前チェックリスト
+
+以下をすべて確認すると、ログイン後にダッシュボードへ遷移しない・API が叩けないといった事故を防げます。
+
+1. **URL 間違いの防止**
+   - `.env.local` やホスティング環境の `NEXT_PUBLIC_API_BASE_URL` / `BACKEND_BASE_URL` が本番 URL（必要なら `/api/python` を含む）になっているか確認します。
+   - **本番環境では** `localhost` や `127.0.0.1` のままデプロイしないでください。Next.js 側では `http://` のまま本番に上げると混在コンテンツでブロックされます。
+2. **CORS 設定**
+   - FastAPI の `CORS_ALLOW_ORIGINS` にフロントエンドの HTTPS URL とプレビュー用サブドメイン（`https://*.vercel.app` など）を登録します。
+   - スキームを省略すると自動で `http://` と `https://` の両方が追加されます。
+3. **HTTPS / Mixed Content**
+   - フロントが HTTPS で公開されている場合は、`NEXT_PUBLIC_API_BASE_URL` にも HTTPS の API エンドポイントを指定するか、変数を消して Next.js の `/api/backend/*` プロキシを利用します。
+   - FastAPI を独自ホストする場合は Let’s Encrypt などで TLS を有効化してください。
+4. **ポート公開の確認**
+   - Render / Railway などで FastAPI をデプロイする場合は、アプリが `$PORT` で起動しているか確認します。ローカルの `8000` 固定起動は本番で動作しません。
+5. **環境変数の登録ミス**
+   - Next.js が参照する変数には `NEXT_PUBLIC_` プレフィックスを付け、Vercel の Environment Variables UI で本番・プレビュー・開発の各環境に設定されているか確認します。
+6. **プロキシ / ルーティング衝突**
+   - Vercel の Edge Function / API Routes と FastAPI のパスが衝突していないか (`/api/*` を二重で使っていないか) を見直します。
+   - 別ホストの FastAPI を呼び出す場合は Next.js の `/api/backend/*` を経由し、ブラウザから直接叩く構成と混在させないようにします。
+7. **認証トークンの送信方法**
+   - ブラウザは `Authorization: Bearer <token>` ヘッダーを送っているか、バックエンドは Cookie を期待していないか確認します。
+   - Cookie を使う場合は `SameSite=None` + `Secure` を忘れないでください。
+8. **ネットワーク制限**
+   - バックエンドがプライベートネットワーク内にあり、フロントエンドから直接アクセスできない構成になっていないかを確認します。
+   - Docker Compose で運用する際は、フロントエンドから見た `localhost` が別コンテナを指す点に注意してください。
 
 ## 既知の制約 / 今後の追加予定
 
