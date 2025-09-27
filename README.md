@@ -69,7 +69,7 @@ npm run build
 | `SECRET_KEY` | バックエンド | `insecure-development-secret` | JWT 署名に使用。必ず本番では十分に長いランダム値を設定してください。 |
 | `DATABASE_URL` | バックエンド | `sqlite:///./library.db` | SQLAlchemy の接続先。PostgreSQL 等に差し替える場合はこちらを変更します。 |
 | `BACKEND_BASE_URL` | フロントエンド (サーバー) | `http://127.0.0.1:8000` | Next.js の API プロキシが転送する先の FastAPI URL。Vercel では未設定でも `/api/python` に配置した FastAPI が自動検出されます。 |
-| `NEXT_PUBLIC_API_BASE_URL` | フロントエンド | `http://127.0.0.1:8000` | ブラウザから呼び出す API のベース URL。HTTPS で公開されていない場合は未設定でも可。 |
+| `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_API_BASE` | フロントエンド | `http://127.0.0.1:8000` | ブラウザから呼び出す API のベース URL。HTTPS で公開されていない場合は未設定でも可。 |
 | `NEXT_PUBLIC_SITE_URL` | フロントエンド | なし | サイトマップ・robots.txt の生成に利用する公開 URL。 |
 | `CORS_ALLOW_ORIGINS` | バックエンド | なし | カンマ区切りで指定したオリジンのみ許可します。スキームを省略すると `http://` と `https://` が両方登録されます。 |
 | `CALIL_APP_KEY` | バックエンド | なし | カーリルのアプリキー。設定すると実際の在架照会 API を使用し、未設定時はスタブデータが返ります。 |
@@ -77,14 +77,14 @@ npm run build
 
 フロントエンド用の公開変数は `.env.local` に記述し、Vercel では Project Settings → Environment Variables に `NEXT_PUBLIC_` から始まるキーとして登録します。サーバーサイド専用の `SECRET_KEY` や `DATABASE_URL` は Vercel の Environment Variables に非公開として登録し、FastAPI をホストする環境（Vercel Serverless Functions もしくは別ホスティング）側で参照してください。
 
-Next.js 側の `/api/backend/*` ルートは `BACKEND_BASE_URL` で指定した FastAPI へサーバーサイド経由でフォワードします。フロントエンドが HTTPS で公開されていてもバックエンドが HTTP のまま連携できるため、Vercel 上で「load failed」となる混在コンテンツエラーを避けられます。公開された HTTPS エンドポイントがある場合は `NEXT_PUBLIC_API_BASE_URL` を設定するとブラウザから直接呼び出す構成にも切り替えられます。カーリル API キーを取得済みの場合は FastAPI 側で `CALIL_APP_KEY` を設定すると本番の在架状況と同期します。
+Next.js 側の `/api/backend/*` ルートは `BACKEND_BASE_URL` で指定した FastAPI へサーバーサイド経由でフォワードします。フロントエンドが HTTPS で公開されていてもバックエンドが HTTP のまま連携できるため、Vercel 上で「load failed」となる混在コンテンツエラーを避けられます。公開された HTTPS エンドポイントがある場合は `NEXT_PUBLIC_API_BASE_URL`（または互換の `NEXT_PUBLIC_API_BASE`）を設定するとブラウザから直接呼び出す構成にも切り替えられます。カーリル API キーを取得済みの場合は FastAPI 側で `CALIL_APP_KEY` を設定すると本番の在架状況と同期します。
 
 ## デプロイ（Vercel）
 
 1. GitHub リポジトリを Vercel プロジェクトに接続します。
 2. Project Settings → Environment Variables に以下を追加します。
    - `BACKEND_BASE_URL`: FastAPI のエンドポイント URL（HTTP/HTTPS どちらでも可）。FastAPI を同じ Vercel プロジェクトの `/api/python` でホストする場合は未設定でも自動で解決されます。
-   - `NEXT_PUBLIC_API_BASE_URL`: 公開したい FastAPI の HTTPS URL（任意。未設定の場合は Next.js のプロキシ `/api/backend/*` を経由）
+   - `NEXT_PUBLIC_API_BASE_URL`（または `NEXT_PUBLIC_API_BASE`）: 公開したい FastAPI の HTTPS URL（任意。未設定の場合は Next.js のプロキシ `/api/backend/*` を経由）
    - `NEXT_PUBLIC_SITE_URL`: `https://{your-project}.vercel.app`
    - `CORS_ALLOW_ORIGINS`: `your-domain.com` のようにカンマ区切りで指定。プレビュー用サブドメインも忘れずに含めてください。
 3. バックエンドを Vercel Serverless Functions で動かす場合は `SECRET_KEY` と `DATABASE_URL` を同じく環境変数として登録します（外部 DB を推奨）。
@@ -96,13 +96,13 @@ Next.js 側の `/api/backend/*` ルートは `BACKEND_BASE_URL` で指定した 
 以下をすべて確認すると、ログイン後にダッシュボードへ遷移しない・API が叩けないといった事故を防げます。
 
 1. **URL 間違いの防止**
-   - `.env.local` やホスティング環境の `NEXT_PUBLIC_API_BASE_URL` / `BACKEND_BASE_URL` が本番 URL（必要なら `/api/python` を含む）になっているか確認します。
+   - `.env.local` やホスティング環境の `NEXT_PUBLIC_API_BASE_URL`（または `NEXT_PUBLIC_API_BASE`） / `BACKEND_BASE_URL` が本番 URL（必要なら `/api/python` を含む）になっているか確認します。
    - **本番環境では** `localhost` や `127.0.0.1` のままデプロイしないでください。Next.js 側では `http://` のまま本番に上げると混在コンテンツでブロックされます。
 2. **CORS 設定**
    - FastAPI の `CORS_ALLOW_ORIGINS` にフロントエンドの HTTPS URL とプレビュー用サブドメイン（`https://*.vercel.app` など）を登録します。
    - スキームを省略すると自動で `http://` と `https://` の両方が追加されます。
 3. **HTTPS / Mixed Content**
-   - フロントが HTTPS で公開されている場合は、`NEXT_PUBLIC_API_BASE_URL` にも HTTPS の API エンドポイントを指定するか、変数を消して Next.js の `/api/backend/*` プロキシを利用します。
+   - フロントが HTTPS で公開されている場合は、`NEXT_PUBLIC_API_BASE_URL`（`NEXT_PUBLIC_API_BASE` でも可）にも HTTPS の API エンドポイントを指定するか、変数を消して Next.js の `/api/backend/*` プロキシを利用します。
    - FastAPI を独自ホストする場合は Let’s Encrypt などで TLS を有効化してください。
 4. **ポート公開の確認**
    - Render / Railway などで FastAPI をデプロイする場合は、アプリが `$PORT` で起動しているか確認します。ローカルの `8000` 固定起動は本番で動作しません。
@@ -117,6 +117,27 @@ Next.js 側の `/api/backend/*` ルートは `BACKEND_BASE_URL` で指定した 
 8. **ネットワーク制限**
    - バックエンドがプライベートネットワーク内にあり、フロントエンドから直接アクセスできない構成になっていないかを確認します。
    - Docker Compose で運用する際は、フロントエンドから見た `localhost` が別コンテナを指す点に注意してください。
+
+### プロキシ経路と FastAPI 本体の切り分け
+
+ログインが 405 などで失敗する場合は、Next.js のプロキシ経由か FastAPI 本体かを瞬時に切り分けると原因を特定しやすくなります。
+
+1. **FastAPI をフル URL で直叩きする**
+   ```bash
+   curl -i -X POST "https://<your-fastapi-domain>/token" \
+     -H "content-type: application/x-www-form-urlencoded" \
+     --data "username=demo@example.com&password=demo123"
+   ```
+   - 200 / 401 / 422 のいずれかなら FastAPI のルートは正しく動いているので、Next.js 側のプロキシや書き換えを疑います。
+   - 405 が返る場合はルートやメソッドが異なる可能性があります。`/auth/token` と `/token` の prefix ズレや末尾スラッシュの差分を確認してください。
+2. **FastAPI 側の実際のルートを確認する**
+   - `curl -s https://<your-fastapi-domain>/openapi.json | jq '.paths | keys'` で公開されているパスを一覧できます。
+   - または `https://<your-fastapi-domain>/docs` で Swagger UI を開き、ログインエンドポイントが `/token` なのか `/auth/token` なのかを再確認します。
+3. **フロントからも絶対 URL でテストする**
+   - `.env.local` に `NEXT_PUBLIC_API_BASE_URL=https://<your-fastapi-domain>`（`NEXT_PUBLIC_API_BASE` でも可）を設定すると、ブラウザが Next.js の `/api/backend/*` を迂回して FastAPI に直接 POST するようになります。
+   - これで成功するなら、Next.js 側の rewrite やヘッダー処理がリクエストを変えてしまっている可能性が高いです。
+
+典型的な 405 原因としては (1) ルート prefix のズレ、(2) rewrite でのパス書き換え、(3) JSON 送信などによる Content-Type の不一致、(4) CORS のプリフライトが 405 で落ちて POST が届かない、(5) `/token` と `/token/` の末尾スラッシュ不一致などが挙げられます。上記の手順で原因を切り分けつつ、FastAPI の `CORSMiddleware` 設定が本番 URL を許可しているか、フォームエンコードで `username` / `password` を送っているかを必ず確認してください。
 
 ## 既知の制約 / 今後の追加予定
 

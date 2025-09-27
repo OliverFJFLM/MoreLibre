@@ -76,20 +76,23 @@ function assertProductionSafeBase(base: string): void {
 
   if (/^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3})(?::\d+)?(?:\/.*)?$/i.test(base)) {
     throw new Error(
-      "BACKEND_BASE_URL/NEXT_PUBLIC_API_BASE_URL points to localhost in production. Configure a publicly reachable FastAPI endpoint or remove the variables to use the /api/python proxy."
+      "BACKEND_BASE_URL/NEXT_PUBLIC_API_BASE(_URL) points to localhost in production. Configure a publicly reachable FastAPI endpoint or remove the variables to use the /api/python proxy."
     );
   }
 
   if (base.startsWith("http://") && !productionHttpWarningEmitted) {
     productionHttpWarningEmitted = true;
     console.warn(
-      "BACKEND_BASE_URL/NEXT_PUBLIC_API_BASE_URL is using http:// in production. Ensure the backend supports HTTPS or rely on the built-in /api/backend proxy to avoid mixed content issues."
+      "BACKEND_BASE_URL/NEXT_PUBLIC_API_BASE(_URL) is using http:// in production. Ensure the backend supports HTTPS or rely on the built-in /api/backend proxy to avoid mixed content issues."
     );
   }
 }
 
 function resolveBackendBase(request: NextRequest): string {
-  const explicit = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
+  const explicit =
+    process.env.BACKEND_BASE_URL ??
+    process.env.NEXT_PUBLIC_API_BASE ??
+    process.env.NEXT_PUBLIC_API_BASE_URL;
   if (explicit && explicit.trim().length > 0) {
     const sanitized = stripTrailingSlash(explicit.trim());
     assertProductionSafeBase(sanitized);
