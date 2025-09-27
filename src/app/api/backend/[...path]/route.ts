@@ -10,6 +10,17 @@ function ensureHttpsOrigin(value: string): string {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
+function firstHeaderValue(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const match = value
+    .split(",")
+    .map((part) => part.trim())
+    .find(Boolean);
+  return match ?? null;
+}
+
 function resolveBackendBase(request: NextRequest): string {
   const explicit = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
   if (explicit && explicit.trim().length > 0) {
@@ -24,23 +35,39 @@ function resolveBackendBase(request: NextRequest): string {
     return `${vercelOrigin}/api/python`;
   }
 
-  const requestOrigin = request.nextUrl.origin;
-  if (requestOrigin && requestOrigin.trim().length > 0) {
-    return `${stripTrailingSlash(requestOrigin.trim())}/api/python`;
+  let requestOrigin: string | null = null;
+  try {
+    const origin = request.nextUrl.origin;
+    if (origin && origin.trim().length > 0) {
+      requestOrigin = stripTrailingSlash(origin.trim());
+    }
+  } catch (error) {
+    requestOrigin = null;
+  }
+  if (requestOrigin) {
+    return `${requestOrigin}/api/python`;
   }
 
-  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (forwardedHost && forwardedHost.trim().length > 0) {
-    const host = forwardedHost.split(",").map((value) => value.trim()).find(Boolean);
-    if (host) {
-      const forwardedProto =
-        request.headers.get("x-forwarded-proto") ?? request.headers.get("x-forwarded-protocol");
-      const protocol =
-        forwardedProto?.split(",").map((value) => value.trim()).find(Boolean) ??
-        request.nextUrl.protocol.replace(/:$/, "") ??
-        "https";
-      return `${stripTrailingSlash(`${protocol}://${host}`)}/api/python`;
-    }
+  const host =
+    firstHeaderValue(request.headers.get("x-forwarded-host")) ??
+    firstHeaderValue(request.headers.get("host"));
+  if (host) {
+    const protocol =
+      firstHeaderValue(request.headers.get("x-forwarded-proto")) ??
+      firstHeaderValue(request.headers.get("x-forwarded-protocol")) ??
+      (() => {
+        try {
+          const proto = request.nextUrl.protocol.replace(/:$/, "");
+          if (proto) {
+            return proto;
+          }
+        } catch (error) {
+          return undefined;
+        }
+        return undefined;
+      })() ??
+      (host.includes("localhost") ? "http" : "https");
+    return `${stripTrailingSlash(`${protocol}://${host}`)}/api/python`;
   }
 
   throw new Error("Unable to resolve backend origin from request");
