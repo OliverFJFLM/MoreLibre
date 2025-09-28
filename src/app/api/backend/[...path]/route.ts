@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 type RouteContext = { params: { path?: string[] } };
 
 let productionHttpWarningEmitted = false;
+const DEFAULT_PROXY_TIMEOUT_MS = 15_000;
 
 function stripTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
@@ -182,6 +183,34 @@ function httpsFallback(base: string): string | null {
   return null;
 }
 
+function isAbortError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if (error.name === "AbortError") {
+    return true;
+  }
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+  return false;
+}
+
+async function fetchUpstreamWithTimeout(
+  url: URL,
+  init: RequestInit,
+  timeoutMs: number = DEFAULT_PROXY_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function copyRequestHeaders(request: NextRequest): Headers {
   const headers = new Headers();
   request.headers.forEach((value, key) => {
@@ -225,18 +254,51 @@ async function proxy(request: NextRequest, context: RouteContext) {
 
   let upstreamResponse: Response;
   try {
-    upstreamResponse = await fetch(targetUrl, init);
+    upstreamResponse = await fetchUpstreamWithTimeout(targetUrl, init);
   } catch (error) {
+    if (isAbortError(error)) {
+      console.error("Backend request timed out", {
+        target: targetUrl.toString(),
+      });
+      return new Response(
+        JSON.stringify({
+          detail: "Backend request timed out",
+          suggestion: "Ensure the FastAPI deployment responds within 15 seconds or adjust BACKEND_BASE_URL.",
+        }),
+        {
+          status: 504,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const alternativeBase = httpsFallback(base);
     if (alternativeBase) {
       const httpsUrl = buildTargetUrl(pathSegments, request, alternativeBase);
       try {
-        upstreamResponse = await fetch(httpsUrl, init);
+        upstreamResponse = await fetchUpstreamWithTimeout(httpsUrl, init);
         console.info("Proxied request via HTTPS fallback", {
           originalTarget: targetUrl.toString(),
           fallbackTarget: httpsUrl.toString(),
         });
       } catch (secondaryError) {
+        if (isAbortError(secondaryError)) {
+          console.error("Backend request timed out after HTTPS fallback", {
+            originalTarget: targetUrl.toString(),
+            fallbackTarget: httpsUrl.toString(),
+          });
+          return new Response(
+            JSON.stringify({
+              detail: "Backend request timed out",
+              suggestion:
+                "Confirm the FastAPI endpoint is reachable over HTTPS or remove BACKEND_BASE_URL to use the internal proxy.",
+            }),
+            {
+              status: 504,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
         console.error("Failed to proxy request", {
           target: targetUrl.toString(),
           attemptedFallback: httpsUrl.toString(),
@@ -254,16 +316,16 @@ async function proxy(request: NextRequest, context: RouteContext) {
           }
         );
       }
-    } else {
-      console.error("Failed to proxy request", { target: targetUrl.toString(), error });
-      return new Response(
-        JSON.stringify({ detail: "Unable to reach backend service" }),
-        {
-          status: 502,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
     }
+
+    console.error("Failed to proxy request", { target: targetUrl.toString(), error });
+    return new Response(
+      JSON.stringify({ detail: "Unable to reach backend service" }),
+      {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   return new Response(upstreamResponse.body, {

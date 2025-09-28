@@ -1,7 +1,52 @@
 import type { Goal, GoalBook, GoalStatus, RecommendationResponse } from "./types";
 
+const DEFAULT_TIMEOUT_MS = 15_000;
+const LONG_RUNNING_TIMEOUT_MS = 45_000;
+
 let warnedMixedContent = false;
 let warnedLocalhostInProduction = false;
+
+function isAbortError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if (error.name === "AbortError") {
+    return true;
+  }
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+  return false;
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    return response;
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error(
+        "バックエンドからの応答がタイムアウトしました。API の URL やネットワーク設定を確認してください。",
+        { cause: error instanceof Error ? error : undefined }
+      );
+    }
+    if (error instanceof TypeError) {
+      throw new Error("バックエンドに接続できませんでした。環境変数やネットワーク設定を確認してください。", {
+        cause: error,
+      });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function resolveApiBaseUrl(): string {
   const configured =
@@ -63,7 +108,7 @@ export async function registerUser(payload: {
   password: string;
   full_name?: string;
 }): Promise<void> {
-  const response = await fetch(withBase("/users"), {
+  const response = await fetchWithTimeout(withBase("/users"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -82,7 +127,7 @@ export async function login(payload: {
   body.append("username", payload.email);
   body.append("password", payload.password);
 
-  const response = await fetch(withBase("/token"), {
+  const response = await fetchWithTimeout(withBase("/token"), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -92,7 +137,7 @@ export async function login(payload: {
 }
 
 export async function fetchGoals(token: string): Promise<Goal[]> {
-  const response = await fetch(withBase("/goals"), {
+  const response = await fetchWithTimeout(withBase("/goals"), {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
@@ -103,7 +148,7 @@ export async function createGoal(
   token: string,
   payload: { title: string; description?: string }
 ): Promise<Goal> {
-  const response = await fetch(withBase("/goals"), {
+  const response = await fetchWithTimeout(withBase("/goals"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -126,14 +171,14 @@ export async function requestRecommendations(
   },
   token?: string
 ): Promise<RecommendationResponse> {
-  const response = await fetch(withBase("/recommendations"), {
+  const response = await fetchWithTimeout(withBase("/recommendations"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(payload),
-  });
+  }, LONG_RUNNING_TIMEOUT_MS);
   return handleResponse<RecommendationResponse>(response);
 }
 
@@ -143,7 +188,7 @@ export async function updateGoalBookStatus(
   goalBookId: number,
   status: GoalStatus
 ): Promise<GoalBook> {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     withBase(`/goals/${goalId}/books/${goalBookId}/status`),
     {
       method: "POST",
